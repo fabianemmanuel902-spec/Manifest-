@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cargo Manifest Generator + Smart Bot</title>
+    <style>
+        :root {
+            --primary: #1a365d;
+            --secondary: #2b6cb0;
+            --accent: #ed8936;
+            --bg: #f0f4f8;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #2d3748;
+            --muted: #718096;
+            --success: #38a169;
+            --danger: #e53e3e;
+            --purple: #6b46c1;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white; padding: 1.25rem 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .header h1 { font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 0.6rem; }
+        .header p { opacity: 0.9; margin-top: 0.2rem; font-size: 0.9rem; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+        .card {
+            background: var(--card); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border: 1px solid var(--border); margin-bottom: 1.25rem; overflow: hidden;
+        }
+        .card-header {
+            background: #edf2f7; padding: 0.9rem 1.1rem; border-bottom: 1px solid var(--border);
+            font-weight: 600; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+        }
+        .card-body { padding: 1.1rem; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.85rem; }
+        .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+        .form-group label {
+            font-size: 0.75rem; font-weight: 600; color: var(--muted);
+            text-transform: uppercase; letter-spacing: 0.03em;
+        }
+        .form-group input, .form-group textarea {
+            padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px;
+            font-size: 0.9rem; font-family: inherit; transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none; border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(43, 108, 176, 0.15);
+        }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
+            padding: 0.6rem 1.1rem; border: none; border-radius: 8px; font-weight: 600;
+            font-size: 0.875rem; cursor: pointer; transition: all 0.15s;
+        }
+        .btn-primary { background: var(--secondary); color: white; }
+        .btn-primary:hover { background: #2c5282; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #2f855a; }
+        .btn-danger { background: var(--danger); color: white; padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+        .btn-danger:hover { background: #c53030; }
+        .btn-secondary { background: #edf2f7; color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: #e2e8f0; }
+        .btn-purple { background: var(--purple); color: white; }
+        .btn-purple:hover { background: #553c9a; }
+        .btn-group { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.9rem; }
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th {
+            background: var(--primary); color: white; padding: 0.65rem 0.5rem; text-align: left;
+            font-weight: 600; white-space: nowrap;
+        }
+        td { padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:nth-child(even) { background: #f8fafc; }
+        tr:hover { background: #ebf8ff; }
+        .actions { display: flex; gap: 0.35rem; }
+        .summary-bar {
+            display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 0.9rem 1.1rem;
+            background: #edf2f7; border-top: 1px solid var(--border); font-weight: 600;
+        }
+        .summary-item { display: flex; flex-direction: column; }
+        .summary-item span { font-size: 0.7rem; color: var(--muted); font-weight: 500; text-transform: uppercase; }
+        .summary-item strong { font-size: 1.15rem; color: var(--primary); }
+        .manifest-header-info {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.85rem;
+        }
+        .info-box {
+            background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 0.65rem 0.85rem;
+        }
+        .info-box label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; display: block; }
+        .info-box input {
+            width: 100%; border: none; background: transparent; font-size: 1rem;
+            font-weight: 600; color: var(--primary); padding: 0.2rem 0;
+        }
+        .info-box input:focus { outline: none; }
+        .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--muted); }
+        .library-count {
+            background: var(--purple); color: white; font-size: 0.75rem; padding: 0.2rem 0.55rem;
+            border-radius: 9999px; font-weight: 600;
+        }
+        .ai-box {
+            background: linear-gradient(135deg, #faf5ff, #ebf8ff);
+            border: 2px dashed #9f7aea;
+            border-radius: 12px;
+            padding: 1.1rem;
+        }
+        .ai-box h3 { font-size: 1rem; margin-bottom: 0.4rem; color: var(--purple); display: flex; align-items: center; gap: 0.4rem; }
+        .ai-box p { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.75rem; }
+        .ai-box textarea {
+            width: 100%; min-height: 140px; padding: 0.75rem; border: 1px solid #d6bcfa;
+            border-radius: 8px; font-size: 0.9rem; font-family: ui-monospace, monospace; resize: vertical;
+        }
+        .ai-box textarea:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 3px rgba(107,70,193,0.15); }
+        .hint {
+            font-size: 0.8rem; color: var(--muted); background: #f7fafc; border-radius: 8px;
+            padding: 0.7rem 0.9rem; margin-top: 0.75rem; border-left: 3px solid var(--secondary);
+        }
+        .match-found { background: #c6f6d5 !important; }
+        .match-missing { background: #fed7d7 !important; }
+        .status-msg {
+            margin-top: 0.75rem; padding: 0.65rem 0.9rem; border-radius: 8px; font-size: 0.875rem; display: none;
+        }
+        .status-msg.success { background: #c6f6d5; color: #22543d; display: block; }
+        .status-msg.error { background: #fed7d7; color: #742a2a; display: block; }
+        .status-msg.info { background: #bee3f8; color: #2a4365; display: block; }
+        @media print {
+            body { background: white; }
+            .header, .no-print, .actions, .btn, .card-header button { display: none !important; }
+            .card { box-shadow: none; border: 1px solid #ccc; }
+            table { font-size: 0.8rem; }
+            th { background: #333 !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+        @media (max-width: 600px) {
+            .header h1 { font-size: 1.25rem; }
+            .container { padding: 0.75rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+            </svg>
+            Cargo Manifest Generator + Smart Bot
+        </h1>
+        <p>Paste AI-extracted text or ULDs → Auto-build professional cargo manifests</p>
+    </div>
+    
+    <div class="container">
+
+        <!-- ========== AI PASTE SECTION (MAIN) ========== -->
+        <div class="card no-print">
+            <div class="card-header">
+                <span>🤖 Smart Bot – Paste AI Extracted Text</span>
+                <span class="library-count" id="libraryCount">0 stored</span>
+            </div>
+            <div class="card-body">
+                <div class="ai-box">
+                    <h3>
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        How to use (best accuracy)
+                    </h3>
+                    <p>
+                        1. Take a clear photo of the logbook page<br>
+                        2. Upload the photo to <strong>Grok</strong>, <strong>ChatGPT</strong> or <strong>Gemini</strong> and ask:<br>
+                        <em>“Extract all cargo rows as a clean table with columns: ULD, AWB, Pcs, Origin, Destination, Net Weight, Tare Weight, Gross Weight, Agency”</em><br>
+                        3. Copy the AI reply and paste it in the box below.
+                    </p>
+                    <textarea id="aiText" placeholder="Paste the full text that Grok / ChatGPT / Gemini gave you here...
+
+Example:
+ULD          AWB            Pcs    ORG  DEST  Net      Tare  Gross  Agency
+PAG 81696US  932 7810 8693  5/13   LOS  LHR   1435     115   1550   Evergreen
+AKE 71016US  932 7810 8785  55/69  LOS  LHR   1077     69    900    Adayok
+..."></textarea>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-purple" onclick="parseAndCreateManifest()">
+                        Parse Text → Create Manifest
+                    </button>
+                    <button class="btn btn-success" onclick="parseAndSaveToLibrary()">
+                        Parse Text → Save to Library
+                    </button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('aiText').value=''">Clear Text</button>
+                </div>
+                <div id="parseStatus" class="status-msg"></div>
+
+                <div class="hint">
+                    <strong>Tip:</strong> The more structured the AI output is (table or clear lines), the better the parser works.
+                    Even messy text usually works if ULD codes and AWB numbers are present.
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== QUICK ULD PASTE ========== -->
+        <div class="card no-print">
+            <div class="card-header">⚡ Quick Manifest – Paste ULDs only</div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label>Paste ULD codes (one per line or comma-separated)</label>
+                    <textarea id="uldPaste" rows="3" placeholder="PAG 81696US&#10;AKE 71016US&#10;PMC 99391US&#10;AKE 71458US" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:8px;font-size:0.9rem;"></textarea>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="buildFromULDs()">Auto-Create Manifest from Pasted ULDs</button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('uldPaste').value=''">Clear</button>
+                    <button class="btn btn-secondary" onclick="viewLibrary()">View Library</button>
+                    <button class="btn btn-secondary" onclick="clearLibrary()">Reset Library</button>
+                    <button class="btn btn-secondary" onclick="loadSampleData()">Load Sample Data</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== MANIFEST INFO ========== -->
+        <div class="card">
+            <div class="card-header">Manifest Information</div>
+            <div class="card-body">
+                <div class="manifest-header-info">
+                    <div class="info-box">
+                        <label>Manifest Date</label>
+                        <input type="date" id="manifestDate" value="2026-07-24">
+                    </div>
+                    <div class="info-box">
+                        <label>Flight / Reference</label>
+                        <input type="text" id="flightRef" value="24-07-26">
+                    </div>
+                    <div class="info-box">
+                        <label>Origin</label>
+                        <input type="text" id="defaultOrigin" value="LOS">
+                    </div>
+                    <div class="info-box">
+                        <label>Destination</label>
+                        <input type="text" id="defaultDest" value="LHR">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ========== MANUAL ENTRY ========== -->
+        <div class="card no-print">
+            <div class="card-header">Manual Entry / Edit</div>
+            <div class="card-body">
+                <div class="form-grid">
+                    <div class="form-group"><label>ULD</label><input type="text" id="uld" placeholder="PAG 81696US"></div>
+                    <div class="form-group"><label>AWB</label><input type="text" id="awb" placeholder="932 7810 8693"></div>
+                    <div class="form-group"><label>Pcs</label><input type="text" id="pcs" placeholder="5/13"></div>
+                    <div class="form-group"><label>ORG</label><input type="text" id="org" value="LOS"></div>
+                    <div class="form-group"><label>DEST</label><input type="text" id="dest" value="LHR"></div>
+                    <div class="form-group"><label>Net Weight</label><input type="text" id="netWeight" placeholder="1435"></div>
+                    <div class="form-group"><label>Tare Weight</label><input type="text" id="tareWeight" placeholder="115"></div>
+                    <div class="form-group"><label>Gross Weight</label><input type="text" id="grossWeight" placeholder="1550"></div>
+                    <div class="form-group"><label>Agency</label><input type="text" id="agency" placeholder="Evergreen"></div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" id="addBtn" onclick="addEntry()">Add Entry</button>
+                    <button class="btn btn-secondary" onclick="clearForm()">Clear Form</button>
+                    <button class="btn btn-purple" onclick="saveCurrentToLibrary()">Save to Library</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ========== MANIFEST TABLE ========== -->
+        <div class="card">
+            <div class="card-header">
+                <span>Cargo Manifest</span>
+                <div class="btn-group" style="margin:0">
+                    <button class="btn btn-success no-print" onclick="window.print()">Print</button>
+                    <button class="btn btn-secondary no-print" onclick="exportCSV()">Export CSV</button>
+                    <button class="btn btn-danger no-print" onclick="clearAll()">Clear All</button>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th><th>ULD</th><th>AWB</th><th>Pcs</th><th>ORG</th><th>DEST</th>
+                            <th>Net</th><th>Tare</th><th>Gross</th><th>Agency</th>
+                            <th class="no-print">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="manifestBody"></tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="empty-state">
+                <p>No entries yet. Paste AI text or ULDs above to start.</p>
+            </div>
+            <div class="summary-bar" id="summaryBar" style="display:none">
+                <div class="summary-item"><span>Entries</span><strong id="totalEntries">0</strong></div>
+                <div class="summary-item"><span>Gross Weight (kg)</span><strong id="totalGross">0</strong></div>
+                <div class="summary-item"><span>Net Weight (kg)</span><strong id="totalNet">0</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Library Modal -->
+    <div id="libraryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;padding:1rem;overflow:auto">
+        <div class="card" style="max-width:960px;margin:1rem auto">
+            <div class="card-header">
+                <span>📚 Stored Library</span>
+                <button class="btn btn-secondary" onclick="document.getElementById('libraryModal').style.display='none'">Close</button>
+            </div>
+            <div class="card-body">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ULD</th><th>AWB</th><th>Pcs</th><th>ORG</th><th>DEST</th>
+                                <th>Net</th><th>Tare</th><th>Gross</th><th>Agency</th><th>Source</th>
+                            </tr>
+                        </thead>
+                        <tbody id="libraryBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let entries = [];
+        let editIndex = -1;
+        let library = [];
+
+        const sampleData = [
+            { uld: "PAG 81696US", awb: "932 7810 8693", pcs: "5/13", org: "LOS", dest: "LHR", netWeight: "1435", tareWeight: "115", grossWeight: "1550", agency: "Evergreen", source: "sample" },
+            { uld: "AKE 71016US", awb: "932 7810 8785", pcs: "55/69", org: "LOS", dest: "LHR", netWeight: "1077", tareWeight: "69", grossWeight: "900", agency: "Adayok", source: "sample" },
+            { uld: "PMC 99391US", awb: "932 7810 8704", pcs: "5/11", org: "LOS", dest: "LHR", netWeight: "3610", tareWeight: "125", grossWeight: "1875", agency: "Evergreen", source: "sample" },
+            { uld: "PMC 94752US", awb: "932 7810 8883", pcs: "5/13", org: "LOS", dest: "LHR", netWeight: "1420", tareWeight: "125", grossWeight: "1545", agency: "Evergreen", source: "sample" },
+            { uld: "AKE 71458US", awb: "932 7810 8505", pcs: "55/64", org: "LOS", dest: "LHR", netWeight: "846", tareWeight: "69", grossWeight: "915", agency: "TMF", source: "sample" },
+            { uld: "PMC 99127US", awb: "932 7810 8682", pcs: "5", org: "LOS", dest: "LHR", netWeight: "1768", tareWeight: "125", grossWeight: "1945", agency: "John guester", source: "sample" },
+            { uld: "PAG 81927US", awb: "932 7810 8730", pcs: "5/11", org: "LOS", dest: "LHR", netWeight: "1460", tareWeight: "115", grossWeight: "1575", agency: "G-Maruelans", source: "sample" },
+            { uld: "PMC 91867US", awb: "932 7810 8730", pcs: "6/11", org: "LOS", dest: "LHR", netWeight: "3081", tareWeight: "125", grossWeight: "1710", agency: "G-Maruelans", source: "sample" },
+            { uld: "AKE 70211US", awb: "932 7810 8693", pcs: "2/13", org: "LOS", dest: "LHR", netWeight: "3458", tareWeight: "69", grossWeight: "300", agency: "Evergreen", source: "sample" },
+            { uld: "PAG 81638US", awb: "932 7810 7794", pcs: "4", org: "LOS", dest: "LHR", netWeight: "1200", tareWeight: "115", grossWeight: "", agency: "Oluns", source: "sample" },
+            { uld: "AKE 70135US", awb: "932 7810 8900", pcs: "35/40", org: "LOS", dest: "LHR", netWeight: "586", tareWeight: "69", grossWeight: "655", agency: "Manyashaw", source: "sample" },
+            { uld: "PMC 91696US", awb: "932 7810 8100", pcs: "7/11", org: "LOS", dest: "LHR", netWeight: "1726", tareWeight: "125", grossWeight: "", agency: "Undaro", source: "sample" },
+            { uld: "AKE 72173US", awb: "932 7810 6465", pcs: "2", org: "LOS", dest: "LHR", netWeight: "1610", tareWeight: "", grossWeight: "", agency: "Cleared", source: "sample" },
+            { uld: "AKE 72029US", awb: "8800", pcs: "5/40", org: "LOS", dest: "LHR", netWeight: "649", tareWeight: "", grossWeight: "", agency: "", source: "sample" },
+            { uld: "Cart", awb: "932 7810 8785", pcs: "5/69", org: "LOS", dest: "LHR", netWeight: "1077", tareWeight: "70", grossWeight: "135", agency: "Adayok", source: "sample" },
+            { uld: "Cart", awb: "932 7810 8166", pcs: "2", org: "LOS", dest: "LHR", netWeight: "21", tareWeight: "40", grossWeight: "", agency: "Sky episode", source: "sample" },
+            { uld: "Cart", awb: "932 7810 8505", pcs: "9/64", org: "LOS", dest: "LHR", netWeight: "", tareWeight: "", grossWeight: "", agency: "TMF", source: "sample" },
+        ];
+
+        // ---------- Storage ----------
+        function loadLibrary() {
+            try {
+                const saved = localStorage.getItem('cargoLibrary');
+                library = saved ? JSON.parse(saved) : [];
+            } catch(e) { library = []; }
+            if (library.length === 0) {
+                library = JSON.parse(JSON.stringify(sampleData));
+                saveLibrary();
+            }
+            updateLibraryCount();
+        }
+        function saveLibrary() {
+            localStorage.setItem('cargoLibrary', JSON.stringify(library));
+            updateLibraryCount();
+        }
+        function updateLibraryCount() {
+            document.getElementById('libraryCount').textContent = library.length + ' stored';
+        }
+
+        // ---------- Smart Parser ----------
+        function parseAIText(text) {
+            if (!text || !text.trim()) return [];
+
+            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 3);
+            const results = [];
+            const seen = new Set();
+
+            // Common ULD patterns
+            const uldRe = /\b((?:PAG|AKE|PMC|PLA|PRA|AAP|AMJ|AMA|P1P|PGA|Cart|CART)[\s\-]?[A-Z0-9]{3,12}(?:US)?)\b/i;
+            // AWB patterns (932 prefix common in your logbook)
+            const awbRe = /\b((?:932[\s\-]?)?(?:\d{3,4}[\s\-]?\d{4}[\s\-]?\d{3,4}|\d{11,12}))\b/;
+            // Pieces like 5/13 or just 5
+            const pcsRe = /\b(\d{1,3}\/\d{1,3}|\b\d{1,3}\b)(?=\s|$)/;
+            // Airports
+            const airportRe = /\b(LOS|LHR|JFK|DXB|FRA|AMS|CDG|NBO|ACC|LGG|OST)\b/gi;
+
+            for (const line of lines) {
+                // Skip pure header lines
+                if (/^(uld|awb|pcs|org|dest|net|tare|gross|agency|#|no\.?)/i.test(line) && line.length < 60) continue;
+
+                const uldMatch = line.match(uldRe);
+                const awbMatch = line.match(awbRe);
+
+                // Must have at least ULD or AWB
+                if (!uldMatch && !awbMatch) continue;
+
+                const uld = uldMatch ? uldMatch[1].replace(/\s+/g, ' ').toUpperCase() : '';
+                const awb = awbMatch ? awbMatch[1].replace(/\s+/g, ' ') : '';
+
+                // Deduplicate
+                const key = (uld + '|' + awb).toLowerCase();
+                if (seen.has(key)) continue;
+                seen.add(key);
+
+                // Extract airports
+                const airports = [...line.matchAll(airportRe)].map(m => m[0].toUpperCase());
+                let org = airports[0] || 'LOS';
+                let dest = airports[1] || (airports[0] === 'LOS' ? 'LHR' : 'LHR');
+
+                // Extract numbers for weights (prefer larger numbers for net/gross)
+                const nums = (line.match(/\b\d{2,5}(?:\.\d+)?\b/g) || []).map(n => parseFloat(n));
+                let net = '', tare = '', gross = '';
+                if (nums.length >= 3) {
+                    // Heuristic: smallest is often tare, largest gross or net
+                    const sorted = [...nums].sort((a,b) => a-b);
+                    tare = String(sorted[0]);
+                    net = String(sorted[1] || sorted[0]);
+                    gross = String(sorted[sorted.length-1]);
+                } else if (nums.length === 2) {
+                    net = String(nums[0]);
+                    gross = String(nums[1]);
+                } else if (nums.length === 1) {
+                    net = String(nums[0]);
+                }
+
+                // Pieces
+                let pcs = '';
+                const pcsMatch = line.match(/(\d{1,3}\/\d{1,3})/);
+                if (pcsMatch) pcs = pcsMatch[1];
+                else {
+                    // fallback single number that looks like pieces (small)
+                    const small = nums.find(n => n < 100 && n === Math.floor(n));
+                    if (small) pcs = String(small);
+                }
+
+                // Agency – last meaningful word(s)
+                let agency = '';
+                const agencyCandidates = ['Evergreen','Adayok','TMF','Sky episode','John guester','G-Maruelans','Oluns','Manyashaw','Undaro','Cleared','Sky','Episode'];
+                for (const a of agencyCandidates) {
+                    if (line.toLowerCase().includes(a.toLowerCase())) {
+                        agency = a;
+                        break;
+                    }
+                }
+                if (!agency) {
+                    // take last 1-2 words that are not numbers/airports
+                    const words = line.split(/\s+/).filter(w => w.length > 2 && !/^\d+/.test(w) && !airportRe.test(w));
+                    if (words.length) agency = words[words.length-1].replace(/[^a-zA-Z\-]/g,'');
+                }
+
+                results.push({
+                    uld, awb, pcs, org, dest,
+                    netWeight: net,
+                    tareWeight: tare,
+                    grossWeight: gross,
+                    agency,
+                    source: 'ai-parse'
+                });
+            }
+
+            // Also try splitting by common table separators if few results
+            if (results.length < 2) {
+                // Try pipe or tab separated
+                for (const line of lines) {
+                    if (line.includes('|') || line.includes('\t')) {
+                        const parts = line.split(/[|\t]/).map(p => p.trim()).filter(Boolean);
+                        if (parts.length >= 4) {
+                            results.push({
+                                uld: parts[0] || '',
+                                awb: parts[1] || '',
+                                pcs: parts[2] || '',
+                                org: parts[3] || 'LOS',
+                                dest: parts[4] || 'LHR',
+                                netWeight: parts[5] || '',
+                                tareWeight: parts[6] || '',
+                                grossWeight: parts[7] || '',
+                                agency: parts[8] || '',
+                                source: 'ai-parse'
+                            });
+                        }
+                    }
+                }
+            }
+
+            return results;
+        }
+
+        function showStatus(msg, type = 'info') {
+            const el = document.getElementById('parseStatus');
+            el.className = 'status-msg ' + type;
+            el.textContent = msg;
+            if (type === 'success') setTimeout(() => el.style.display = 'none', 6000);
+        }
+
+        function parseAndCreateManifest() {
+            const text = document.getElementById('aiText').value;
+            const parsed = parseAIText(text);
+            if (parsed.length === 0) {
+                showStatus('No cargo rows could be detected. Make sure the text contains ULD codes (PAG/AKE/PMC…) or AWB numbers.', 'error');
+                return;
+            }
+            entries = parsed;
+            renderTable();
+            showStatus(`✅ Successfully created manifest with ${parsed.length} entries from the pasted text.`, 'success');
+            // Scroll to table
+            document.getElementById('manifestBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function parseAndSaveToLibrary() {
+            const text = document.getElementById('aiText').value;
+            const parsed = parseAIText(text);
+            if (parsed.length === 0) {
+                showStatus('No cargo rows could be detected.', 'error');
+                return;
+            }
+            let added = 0;
+            parsed.forEach(p => {
+                const exists = library.some(l => 
+                    normalizeULD(l.uld) === normalizeULD(p.uld) && (l.awb || '') === (p.awb || '')
+                );
+                if (!exists) {
+                    library.push(p);
+                    added++;
+                }
+            });
+            saveLibrary();
+            showStatus(`✅ Saved ${added} new entries to library (total: ${library.length}). You can now use Quick ULD paste.`, 'success');
+        }
+
+        // ---------- ULD Quick Build ----------
+        function normalizeULD(u) {
+            return (u || '').replace(/[\s\-]/g, '').toUpperCase();
+        }
+
+        function buildFromULDs() {
+            const raw = document.getElementById('uldPaste').value;
+            if (!raw.trim()) {
+                alert('Paste at least one ULD code.');
+                return;
+            }
+            const tokens = raw.split(/[\n,;]+/).map(t => t.trim()).filter(t => t.length > 2);
+            const found = [];
+            const missing = [];
+
+            tokens.forEach(token => {
+                const norm = normalizeULD(token);
+                let match = library.find(l => normalizeULD(l.uld) === norm);
+                if (!match) {
+                    match = library.find(l => normalizeULD(l.uld).includes(norm) || norm.includes(normalizeULD(l.uld)));
+                }
+                if (match) {
+                    found.push({ ...match });
+                } else {
+                    missing.push(token);
+                    found.push({
+                        uld: token, awb: '', pcs: '', 
+                        org: document.getElementById('defaultOrigin').value,
+                        dest: document.getElementById('defaultDest').value,
+                        netWeight: '', tareWeight: '', grossWeight: '', agency: '',
+                        source: 'missing'
+                    });
+                }
+            });
+
+            entries = found;
+            renderTable();
+
+            let msg = `Built ${found.length} entries. Matched: ${found.length - missing.length}.`;
+            if (missing.length) msg += `\nNot found: ${missing.join(', ')}`;
+            alert(msg);
+        }
+
+        // ---------- Library UI ----------
+        function viewLibrary() {
+            const tbody = document.getElementById('libraryBody');
+            tbody.innerHTML = '';
+            library.forEach(e => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${esc(e.uld)}</td><td>${esc(e.awb)}</td><td>${esc(e.pcs)}</td>
+                    <td>${esc(e.org)}</td><td>${esc(e.dest)}</td>
+                    <td>${esc(e.netWeight)}</td><td>${esc(e.tareWeight)}</td><td>${esc(e.grossWeight)}</td>
+                    <td>${esc(e.agency)}</td><td><small>${esc(e.source)}</small></td>`;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('libraryModal').style.display = 'block';
+        }
+        function clearLibrary() {
+            if (confirm('Reset library to built-in sample data?')) {
+                library = JSON.parse(JSON.stringify(sampleData));
+                saveLibrary();
+                alert('Library reset.');
+            }
+        }
+        function saveCurrentToLibrary() {
+            const entry = getFormEntry();
+            if (!entry.uld && !entry.awb) { alert('Enter ULD or AWB first'); return; }
+            entry.source = 'manual';
+            library.push(entry);
+            saveLibrary();
+            alert('Saved to library!');
+        }
+
+        // ---------- Core ----------
+        function esc(t) {
+            if (t === undefined || t === null || t === '') return '—';
+            const d = document.createElement('div');
+            d.textContent = t;
+            return d.innerHTML;
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('manifestBody');
+            const empty = document.getElementById('emptyState');
+            const bar = document.getElementById('summaryBar');
+            tbody.innerHTML = '';
+
+            if (!entries.length) {
+                empty.style.display = 'block';
+                bar.style.display = 'none';
+                return;
+            }
+            empty.style.display = 'none';
+            bar.style.display = 'flex';
+
+            let totalGross = 0, totalNet = 0;
+            entries.forEach((e, i) => {
+                const tr = document.createElement('tr');
+                if (e.source === 'missing') tr.classList.add('match-missing');
+                else if (e.source && e.source !== 'manual') tr.classList.add('match-found');
+
+                const g = parseFloat(String(e.grossWeight).replace(/[^\d.]/g,'')) || 0;
+                const n = parseFloat(String(e.netWeight).split('/')[0].replace(/[^\d.]/g,'')) || 0;
+                totalGross += g; totalNet += n;
+
+                tr.innerHTML = `
+                    <td>${i+1}</td>
+                    <td>${esc(e.uld)}</td><td>${esc(e.awb)}</td><td>${esc(e.pcs)}</td>
+                    <td>${esc(e.org)}</td><td>${esc(e.dest)}</td>
+                    <td>${esc(e.netWeight)}</td><td>${esc(e.tareWeight)}</td><td>${esc(e.grossWeight)}</td>
+                    <td>${esc(e.agency)}</td>
+                    <td class="no-print">
+                        <div class="actions">
+                            <button class="btn btn-secondary" style="padding:0.25rem 0.45rem;font-size:0.75rem" onclick="editEntry(${i})">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteEntry(${i})">Del</button>
+                        </div>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('totalEntries').textContent = entries.length;
+            document.getElementById('totalGross').textContent = totalGross.toLocaleString();
+            document.getElementById('totalNet').textContent = totalNet.toLocaleString();
+        }
+
+        function getFormEntry() {
+            return {
+                uld: document.getElementById('uld').value.trim(),
+                awb: document.getElementById('awb').value.trim(),
+                pcs: document.getElementById('pcs').value.trim(),
+                org: document.getElementById('org').value.trim() || document.getElementById('defaultOrigin').value,
+                dest: document.getElementById('dest').value.trim() || document.getElementById('defaultDest').value,
+                netWeight: document.getElementById('netWeight').value.trim(),
+                tareWeight: document.getElementById('tareWeight').value.trim(),
+                grossWeight: document.getElementById('grossWeight').value.trim(),
+                agency: document.getElementById('agency').value.trim(),
+                source: 'manual'
+            };
+        }
+
+        function addEntry() {
+            const entry = getFormEntry();
+            if (!entry.uld && !entry.awb) { alert('Enter at least ULD or AWB'); return; }
+            if (editIndex >= 0) {
+                entries[editIndex] = entry;
+                editIndex = -1;
+                document.getElementById('addBtn').textContent = 'Add Entry';
+            } else {
+                entries.push(entry);
+            }
+            clearForm();
+            renderTable();
+        }
+
+        function editEntry(i) {
+            const e = entries[i];
+            document.getElementById('uld').value = e.uld || '';
+            document.getElementById('awb').value = e.awb || '';
+            document.getElementById('pcs').value = e.pcs || '';
+            document.getElementById('org').value = e.org || '';
+            document.getElementById('dest').value = e.dest || '';
+            document.getElementById('netWeight').value = e.netWeight || '';
+            document.getElementById('tareWeight').value = e.tareWeight || '';
+            document.getElementById('grossWeight').value = e.grossWeight || '';
+            document.getElementById('agency').value = e.agency || '';
+            editIndex = i;
+            document.getElementById('addBtn').textContent = 'Update Entry';
+        }
+
+        function deleteEntry(i) {
+            if (confirm('Delete this entry?')) {
+                entries.splice(i, 1);
+                if (editIndex === i) { editIndex = -1; clearForm(); }
+                renderTable();
+            }
+        }
+
+        function clearForm() {
+            ['uld','awb','pcs','netWeight','tareWeight','grossWeight','agency'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('org').value = document.getElementById('defaultOrigin').value;
+            document.getElementById('dest').value = document.getElementById('defaultDest').value;
+            editIndex = -1;
+            document.getElementById('addBtn').textContent = 'Add Entry';
+        }
+
+        function loadSampleData() {
+            if (entries.length && !confirm('Replace current manifest with sample?')) return;
+            entries = JSON.parse(JSON.stringify(sampleData));
+            renderTable();
+        }
+
+        function clearAll() {
+            if (entries.length && confirm('Clear all current entries?')) {
+                entries = [];
+                renderTable();
+            }
+        }
+
+        function exportCSV() {
+            if (!entries.length) { alert('Nothing to export'); return; }
+            const headers = ['#','ULD','AWB','Pcs','ORG','DEST','Net Weight','Tare Weight','Gross Weight','Agency'];
+            const rows = entries.map((e,i) => [i+1,e.uld,e.awb,e.pcs,e.org,e.dest,e.netWeight,e.tareWeight,e.grossWeight,e.agency]);
+            const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(','))].join('\n');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+            a.download = `cargo_manifest_${document.getElementById('manifestDate').value || 'export'}.csv`;
+            a.click();
+        }
+
+        // Init
+        loadLibrary();
+        renderTable();
+    </script>
+</body>
+</html>
